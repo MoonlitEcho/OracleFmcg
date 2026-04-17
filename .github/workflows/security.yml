@@ -1,0 +1,63 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 2 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  codeql:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+
+  dependency-and-sast-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Prepare scan dependencies
+        run: python scripts/sanitize_requirements.py requirements.txt requirements-security.txt --with-dev
+
+      - name: Install scan dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-security.txt
+
+      - name: Run pip-audit
+        run: pip-audit -r requirements-security.txt -f json -o pip-audit-report.json || true
+
+      - name: Run Bandit
+        run: bandit -r api.py app.py -f json -o bandit-report.json || true
+
+      - name: Upload security artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: |
+            pip-audit-report.json
+            bandit-report.json

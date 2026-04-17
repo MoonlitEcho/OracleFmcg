@@ -1,0 +1,28 @@
+services:
+  backend:
+    build:
+      context: .
+      target: backend
+    image: oraclefmcg-backend:local
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+
+  frontend:
+    build:
+      context: .
+      target: frontend
+    image: oraclefmcg-frontend:local
+    depends_on:
+      backend:
+        condition: service_healthy
+    command: >
+      sh -c "mkdir -p /app/.streamlit &&
+      echo 'API_URL = \"http://backend:8000\"' > /app/.streamlit/secrets.toml &&
+      streamlit run app.py --server.address=0.0.0.0 --server.port=8501 --server.headless=true"
+    ports:
+      - "8501:8501"

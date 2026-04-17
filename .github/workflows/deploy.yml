@@ -1,0 +1,100 @@
+name: Deploy
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Deployment environment
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - production
+
+env:
+  REGISTRY: ghcr.io
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  deploy-staging-pr:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build and start staging stack
+        run: docker compose up -d --build
+
+      - name: Staging health checks
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/health > /dev/null && curl -fsS http://localhost:8501 > /dev/null; then
+              exit 0
+            fi
+            sleep 5
+          done
+          docker compose logs
+          exit 1
+
+      - name: Stop staging stack
+        if: always()
+        run: docker compose down -v
+
+  release:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: backend
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/oraclefmcg-backend:${{ github.sha }}
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: frontend
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/oraclefmcg-frontend:${{ github.sha }}
+
+      - name: Deployment smoke test (backend image)
+        run: |
+          docker run -d --name oraclefmcg-backend -p 8000:8000 ${{ env.REGISTRY }}/${{ github.repository_owner }}/oraclefmcg-backend:${{ github.sha }}
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/health > /dev/null; then
+              break
+            fi
+            sleep 5
+          done
+          curl -fsS http://localhost:8000/health
+          docker rm -f oraclefmcg-backend
+
+      - name: Mark deployment
+        run: echo "Deployment to ${{ github.event.inputs.environment }} completed"

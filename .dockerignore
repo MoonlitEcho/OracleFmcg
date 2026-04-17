@@ -1,0 +1,14 @@
+.git
+.github
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.mypy_cache
+.coverage
+venv/
+.venv/
+*.ipynb
+indian_fmcg_dirty_dataset.csv
+indian_fmcg_high_quality_dataset.csv
