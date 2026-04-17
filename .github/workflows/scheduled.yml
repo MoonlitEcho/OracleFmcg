@@ -1,0 +1,44 @@
+name: Scheduled Maintenance
+
+on:
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-health:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Prepare dependency file
+        run: python scripts/sanitize_requirements.py requirements.txt requirements-weekly.txt --with-dev
+
+      - name: Install tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pip-audit
+
+      - name: Weekly audit report
+        run: |
+          pip-audit -r requirements-weekly.txt -f json -o weekly-pip-audit.json || true
+          python -m pip list --outdated --format=json > outdated-packages.json
+
+      - name: Upload maintenance reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-dependency-reports
+          path: |
+            weekly-pip-audit.json
+            outdated-packages.json
