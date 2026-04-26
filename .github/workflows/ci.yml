@@ -73,13 +73,17 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Lowercase repository owner
+        id: repo-owner
+        run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
       - name: Build and optionally push image
         uses: docker/build-push-action@v7
         with:
           context: .
           target: ${{ matrix.target }}
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-          tags: ghcr.io/${{ github.repository_owner }}/oraclefmcg-${{ matrix.target }}:${{ github.sha }}
+          tags: ghcr.io/${{ steps.repo-owner.outputs.owner }}/oraclefmcg-${{ matrix.target }}:${{ github.sha }}
 
   integration:
     runs-on: ubuntu-latest
