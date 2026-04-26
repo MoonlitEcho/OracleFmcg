@@ -11,6 +11,7 @@ BASE_ALLOWED = {
     "fastapi",
     "google-generativeai",
     "joblib",
+    "prometheus-fastapi-instrumentator",
     "lightgbm",
     "numpy",
     "pandas",
