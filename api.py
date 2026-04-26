@@ -10,7 +10,8 @@ from typing import Dict, List
 import os
 from datetime import datetime
 import shap
-
+from prometheus_fastapi_instrumentator import Instrumentator
+Instrumentator().instrument(app).expose(app)
 app = FastAPI(title="FMCG Oracle API", version="1.0")
 
 app.add_middleware(
