@@ -1,11 +1,40 @@
+# Python
 __pycache__/
 *.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+.env/
+.venv/
+
+# Test / coverage / type-check caches
 .pytest_cache/
 .mypy_cache/
 .coverage
 coverage.xml
+htmlcov/
+
+# Generated requirements artifacts
 requirements-ci.txt
 requirements-runtime.txt
 requirements-docs.txt
 requirements-security.txt
 requirements-weekly.txt
+
+# Streamlit / local secrets
+.streamlit/secrets.toml
+.env
+
+# Jupyter / notebooks
+.ipynb_checkpoints/
+
+# OS / Editor
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml

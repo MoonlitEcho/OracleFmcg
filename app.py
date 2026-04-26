@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 # app.py - FMCG Oracle: Enhanced Forecasting with Realistic Variance
+import os
+
 import streamlit as st
 import requests
 import pandas as pd
@@ -68,8 +70,9 @@ hr { margin: 2rem 0 !important; border: none !important; border-top: 2px solid #
 # ═══════════════════════════════════════════════════════════════════
 # CONFIG
 # ═══════════════════════════════════════════════════════════════════
-API_URL = st.secrets.get("API_URL", "http://localhost:8000")
-GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "your_gemini_key")
+
+API_URL = os.getenv("API_URL", "http://localhost:8000")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 gemini_available = False
 try:
@@ -374,37 +377,95 @@ elif nav_mode == "📊 Analytics":
 # ═══════════════════════════════════════════════════════════════════
 elif nav_mode == "🧠 Insights":
     st.markdown('<div class="wow-section"><h2>🤖 AI-Powered Intelligence</h2></div>', unsafe_allow_html=True)
-    insights_category = st.selectbox("Select Category", categories, key="insights_cat")
-    if st.button("🔮 Generate Insights", use_container_width=True):
-        with st.spinner("🧠 Analyzing category data..."):
-            try:
-                predictions_df = pd.read_csv("outputs_final_model/predictions.csv")
-                cat_data = predictions_df[predictions_df["category"] == insights_category]
-                if not cat_data.empty:
-                    numeric_cols = ['price_unit', 'stock_available', 'promotion_flag', 'delivery_days', 'units_sold']
-                    available_cols = [col for col in numeric_cols if col in cat_data.columns]
-                    if len(available_cols) > 1:
-                        correlations = cat_data[available_cols].corr()['units_sold'].drop('units_sold')
-                        top_features = correlations.abs().sort_values(ascending=False).head(10)
-                        top_driver = top_features.index[0]
-                        top_impact = abs(correlations[top_driver])
-                        st.markdown(f'<div class="insight-card"><h3>🏆 Top Driver: {top_driver}</h3><p style="font-size: 1.2rem;"><b>Correlation Impact: {top_impact:.2%}</b></p></div>', unsafe_allow_html=True)
-                        
-                        fig_corr = px.bar(x=top_features.values, y=top_features.index, orientation='h',
-                                          title=f"Feature Correlation with Demand - {insights_category}",
-                                          color=top_features.values, color_continuous_scale="Plasma")
-                        fig_corr.update_layout(template="plotly_white", height=500)
-                        st.plotly_chart(fig_corr, use_container_width=True)
-                        st.success("✅ Insights generated successfully!")
-                    else:
-                        st.warning("Insufficient numerical features for correlation analysis.")
-                else:
-                    st.warning(f"No data available for {insights_category}")
-            except FileNotFoundError:
-                st.error("❌ Predictions data file not found.")
-            except Exception as e:
-                st.error(f"❌ Error: {str(e)}")
 
+    insights_category = st.selectbox(
+        "Select Category",
+        categories,
+        key="insights_cat"
+    )
+
+    if st.button("🔮 Generate Insights", use_container_width=True):
+        with st.spinner("🧠 Analyzing SHAP drivers..."):
+
+            response = safe_api_call(
+                {},
+                endpoint=f"/insights/{insights_category}",
+                method="GET"
+            )
+
+            if response:
+                top_driver = response["top_driver"]
+                top_impact = response["top_impact_pct"]
+                shap_data = response["avg_shap_importance"]
+
+                st.markdown(
+                    f'''
+                    <div class="insight-card">
+                        <h3>🏆 Top Demand Driver: {top_driver}</h3>
+                        <p style="font-size: 1.2rem;">
+                            <b>Impact Contribution: {top_impact}</b>
+                        </p>
+                    </div>
+                    ''',
+                    unsafe_allow_html=True
+                )
+
+                fig_shap = px.bar(
+                    x=list(shap_data.values()),
+                    y=list(shap_data.keys()),
+                    orientation='h',
+                    title=f"SHAP Feature Importance - {insights_category}",
+                    color=list(shap_data.values()),
+                    color_continuous_scale="Plasma"
+                )
+                fig_shap.update_layout(
+                    template="plotly_white",
+                    height=500
+                )
+
+                st.plotly_chart(fig_shap, use_container_width=True)
+
+                if gemini_available:
+                    with st.spinner("🤖 Generating Executive Insights..."):
+                        prompt = f"""
+                        You are an FMCG strategy consultant.
+
+                        Category: {insights_category}
+                        Top Driver: {top_driver}
+                        Driver Impact: {top_impact}
+
+                        SHAP Feature Importances:
+                        {shap_data}
+
+                        Generate:
+                        1. Key business interpretation
+                        2. Inventory recommendation
+                        3. Promotion/pricing strategy
+                        4. Risk/opportunity note
+
+                        Keep under 120 words.
+                        Use bullet points.
+                        """
+
+                        try:
+                            ai_response = GEMINI_MODEL.generate_content(prompt)
+
+                            st.markdown(
+                                f'''
+                                <div class="insight-card">
+                                    <h3>🧠 Executive Recommendations</h3>
+                                    <p>{ai_response.text}</p>
+                                </div>
+                                ''',
+                                unsafe_allow_html=True
+                            )
+                        except Exception as e:
+                            st.warning(f"Gemini failed: {str(e)}")
+
+                st.success("✅ Insights generated successfully!")
+
+            else:
+                st.error("❌ Failed to fetch insights from backend.")
 # ═══════════════════════════════════════════════════════════════════
 # PAGE: SCENARIOS
 # ═══════════════════════════════════════════════════════════════════
