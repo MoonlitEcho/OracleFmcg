@@ -11,7 +11,6 @@ import os
 from datetime import datetime
 import shap
 from prometheus_fastapi_instrumentator import Instrumentator
-Instrumentator().instrument(app).expose(app)
 app = FastAPI(title="FMCG Oracle API", version="1.0")
 
 app.add_middleware(
@@ -157,6 +156,7 @@ async def get_insights(category: str, sample_size: int = 100):
 @app.get("/health")
 def health():
     return {"status": "healthy", "loaded_models": len(models), "total_features_avg": np.mean([len(f) for f in features_dict.values()]) if features_dict else 0}
+Instrumentator().instrument(app).expose(app)
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
