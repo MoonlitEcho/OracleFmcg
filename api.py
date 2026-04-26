@@ -140,7 +140,7 @@ async def get_insights(category: str, sample_size: int = 100):
     avg_shap = np.mean(np.abs(shap_vals_sample), axis=0)  # Avg abs per feature
     
     insights = dict(zip(feats, avg_shap))
-    top_driver = max(insights, key=insights.get)
+    top_driver = max(insights, key=lambda k: insights[k])
     top_impact = insights[top_driver]
     
     top_impact_pct = f"{(top_impact / np.sum(avg_shap) * 100):.1f}%"
