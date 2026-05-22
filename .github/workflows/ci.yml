@@ -128,6 +128,7 @@ jobs:
         run: docker compose down -v
 
   docs:
+
     runs-on: ubuntu-latest
     needs: quality-and-tests
 
@@ -177,3 +178,22 @@ jobs:
         with:
           name: docs-site
           path: site
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    needs: [docker-build, integration]
+
+    steps:
+      - name: Deploy to Azure VM
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.AZURE_VM_HOST }}
+          username: ${{ secrets.AZURE_VM_USER }}
+          key: ${{ secrets.AZURE_VM_SSH_KEY }}
+          script: |
+            cd ~/oraclefmcg
+            docker compose pull
+            docker compose up -d
+            docker image prune -f
+            docker compose ps
+
